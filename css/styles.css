@@ -1,0 +1,151 @@
+/* ============================================================
+   Gruppegenerator – Custom Styles
+   (Tailwind håndterer utility-klasser; dette er kun det
+    der ikke kan udtrykkes med Tailwind alene)
+   ============================================================ */
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f5f5f4; /* stone-100 */
+    color: #334155;            /* slate-700 */
+    margin: 0;
+    overflow: hidden;
+}
+
+/* --- Glasskort (gruppe-cards) -------------------------------- */
+.glass-panel {
+    background-color: #ffffff;
+    border: 2px solid #e7e5e4;
+    border-radius: 1rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02),
+                0 2px 4px -1px rgba(0, 0, 0, 0.02);
+    transition: all 0.3s ease;
+}
+
+/* --- Konfetti-canvas ---------------------------------------- */
+#confetti-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 50;
+}
+
+/* --- Toast-notifikationer ------------------------------------ */
+#toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* --- Elev-chips --------------------------------------------- */
+.student-chip {
+    transition: all 0.3s ease;
+    animation: popIn 0.4s ease-out forwards;
+}
+
+.student-chip.in-pool {
+    background-color: #f8fafc;
+    border-color: #cbd5e1;
+    color: #475569;
+    cursor: default;
+}
+
+/* Maskine-søgning: lys gul fremhævning */
+.student-chip.highlight-search {
+    background-color: #fef3c7 !important;
+    color: #92400e;
+    transform: scale(1.05);
+    border-color: #fde68a;
+    box-shadow: 0 2px 8px rgba(251, 191, 36, 0.2);
+    z-index: 10;
+}
+
+/* Valgt chip: grøn fremhævning */
+.student-chip.highlight-selected {
+    background-color: #d1fae5 !important;
+    color: #065f46;
+    transform: scale(1.1);
+    border-color: #6ee7b7;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+    z-index: 20;
+}
+
+/* Placeret i gruppe */
+.student-chip.placed {
+    background-color: #f0f9ff;
+    border-color: #bae6fd;
+    color: #0369a1;
+    transform: scale(1);
+}
+
+/* --- Gruppe-kort fremhævning (elev-træk) --------------------- */
+.group-highlight-search {
+    border-color: #fcd34d !important;
+    background-color: #fffbeb !important;
+    transform: scale(1.02);
+}
+
+.group-highlight-selected {
+    border-color: #34d399 !important;
+    background-color: #f0fdf4 !important;
+    transform: scale(1.03);
+    box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.1);
+}
+
+/* --- Keyframes ---------------------------------------------- */
+@keyframes popIn {
+    0%   { opacity: 0; transform: scale(0.9) translateY(4px); }
+    100% { opacity: 1; transform: scale(1)   translateY(0);   }
+}
+
+/* --- Scrollbar --------------------------------------------- */
+::-webkit-scrollbar       { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #a8a29e; }
+
+/* --- Print -------------------------------------------------- */
+@media print {
+    /* Vis kun gruppe-griddet */
+    body            { overflow: visible !important; background: white !important; }
+    header          { display: none !important; }
+    #controlPanel   { display: none !important; }
+    #poolArea       { display: none !important; }
+    #resultActions  { display: none !important; }
+    #emptyState     { display: none !important; }
+    #confetti-canvas{ display: none !important; }
+    #toast-container{ display: none !important; }
+
+    #resultsArea {
+        display: block !important;
+        height: auto !important;
+        overflow: visible !important;
+        background: white !important;
+    }
+
+    #groupGrid {
+        display: grid !important;
+        overflow: visible !important;
+        padding: 1rem !important;
+        padding-bottom: 1rem !important;
+        height: auto !important;
+    }
+
+    /* Undgå at gruppe-kort splittes over sideskift */
+    .glass-panel {
+        break-inside: avoid;
+        box-shadow: none !important;
+        border: 1px solid #d1d5db !important;
+    }
+
+    /* Slå animationer fra ved print */
+    .student-chip { animation: none !important; }
+}
+

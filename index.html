@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gruppegenerator - NEST</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="flex flex-col h-[100dvh]">
+
+    <canvas id="confetti-canvas"></canvas>
+    <div id="toast-container"></div>
+
+    <!-- ══════════════════════════════════════════════════════
+         Entropy Modal – Alle elever tegner tilfældighedstallet
+         ══════════════════════════════════════════════════════ -->
+    <div id="entropyModal" class="fixed inset-0 z-[100] bg-stone-50 flex flex-col hidden">
+
+        <!-- Header -->
+        <div class="text-center pt-5 pb-4 px-6 border-b border-stone-200 shrink-0">
+            <h2 id="entropyModalTitle" class="text-lg font-extrabold text-slate-800">Alle elever bidrager til tilfældighedstallet</h2>
+            <p id="entropyModalSubtitle" class="text-slate-500 text-xs mt-1">Hvert navn I tegner blandes ind i lodtrækningens tilfældighedstal</p>
+        </div>
+
+        <!-- Indhold -->
+        <div class="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
+
+            <!-- Tegne-side -->
+            <div class="flex-1 flex flex-col p-4 gap-3 min-h-0">
+
+                <!-- Nuværende elev -->
+                <div class="bg-white rounded-2xl p-3 border border-stone-200 text-center shrink-0 shadow-sm">
+                    <p class="text-slate-400 text-[10px] uppercase tracking-widest mb-0.5">Nu tegner</p>
+                    <p id="entropyCurrentName" class="text-3xl font-extrabold text-slate-800 leading-tight">–</p>
+                    <p id="entropyProgress" class="text-slate-400 text-xs mt-0.5">0 ud af 0</p>
+                </div>
+
+                <!-- Canvas – KUN lærredet er mørkt -->
+                <div class="flex-1 rounded-2xl border-2 border-stone-300 overflow-hidden relative min-h-[140px] shadow-inner">
+                    <canvas id="entropyCanvas" class="w-full h-full block" style="touch-action: none; cursor: crosshair; background: #1c1917;"></canvas>
+                    <div id="entropyCanvasHint" class="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+                        <p class="text-stone-500 font-bold text-base">Tegn dit navn her</p>
+                    </div>
+                </div>
+
+                <!-- Gruppe-afsløring (vises i kombineret tilstand) -->
+                <div id="entropyGroupReveal" class="hidden rounded-xl p-3 text-center border-2 font-bold text-lg transition-all shrink-0 animate-pulse"></div>
+
+                <!-- Handlinger -->
+                <div class="flex gap-2 shrink-0">
+                    <button onclick="skipEntropyStudent()"
+                            class="flex-1 py-2.5 rounded-xl border-2 border-stone-300 text-slate-500 font-semibold text-sm hover:bg-stone-100 active:bg-stone-200 transition-colors select-none">
+                        Spring over
+                    </button>
+                    <button id="entropyNextBtn" onclick="entropyNextAction()" disabled
+                            class="flex-[2] py-2.5 rounded-xl font-bold text-sm transition-all bg-stone-200 text-stone-400 cursor-not-allowed select-none">
+                        <span id="entropyNextBtnText">Tegn noget først...</span>
+                    </button>
+                </div>
+
+                <!-- Seed + progressbar -->
+                <div class="bg-white rounded-xl px-4 py-2.5 border border-stone-200 shadow-sm shrink-0">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-slate-400 text-xs">Tilfældighedstal</span>
+                        <span id="entropySeedDisplay" class="font-mono text-sm font-bold text-teal-600 tracking-widest">–</span>
+                    </div>
+                    <div class="h-1.5 bg-stone-200 rounded-full overflow-hidden">
+                        <div id="entropyBar" class="h-full bg-teal-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Elevliste (højre på desktop) -->
+            <div class="w-full md:w-44 shrink-0 border-t md:border-t-0 md:border-l border-stone-200 bg-white overflow-y-auto p-3 max-h-32 md:max-h-none">
+                <p class="text-slate-400 text-[10px] uppercase tracking-widest mb-2 px-1">Elever</p>
+                <ul id="entropyStudentList" class="flex flex-wrap md:flex-col gap-1"></ul>
+            </div>
+        </div>
+
+        <!-- Footer: Start-knap -->
+        <div class="p-4 border-t border-stone-200 shrink-0">
+            <button id="entropyStartBtn" onclick="confirmEntropy()" disabled
+                    class="w-full py-3.5 rounded-xl font-bold text-base transition-all bg-stone-200 text-stone-400 cursor-not-allowed select-none">
+                <span id="entropyStartBtnText">Ikke alle elever har tegnet endnu</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         Order Modal – Vis trækrækkefølge
+         ══════════════════════════════════════════════════════ -->
+    <div id="orderModal" class="fixed inset-0 z-[100] bg-stone-900/95 flex items-center justify-center p-4 hidden">
+        <div class="bg-stone-800 rounded-2xl border border-stone-700 w-full max-w-md overflow-hidden">
+            <div class="p-5 border-b border-stone-700">
+                <svg class="w-6 h-6 text-teal-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h5l2 2h4a2 2 0 012 2v1M4 4v10a2 2 0 002 2h3m5-12l3 3-3 3m0-3H9m8 6l3 3-3 3m0-3H9"/>
+                </svg>
+                <h2 id="orderModalTitle" class="text-xl font-bold text-white">Tilfældig trækrækkefølge</h2>
+                <p id="orderModalSubtitle" class="text-stone-400 text-sm mt-1">Tjek at alle navne er med – i tilfældig rækkefølge</p>
+            </div>
+            <div id="orderList" class="p-4 overflow-y-auto max-h-72 flex flex-col gap-1.5"></div>
+            <div class="p-4 border-t border-stone-700">
+                <p class="text-emerald-400 text-sm font-semibold mb-3 flex items-center gap-2">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    <span id="orderVerifyText">Alle 0 navne er med</span>
+                </p>
+                <button onclick="confirmOrderAndStart()"
+                        class="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-lg transition-colors">
+                    Start lodtrækning
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <header class="text-center py-4 shrink-0 bg-stone-50 border-b border-stone-200">
+        <h1 class="text-2xl md:text-3xl font-extrabold text-teal-800 tracking-tight">
+            Gruppegenerator
+        </h1>
+        <p class="text-teal-600/80 text-xs md:text-sm font-semibold uppercase tracking-wider mt-1">Struktur &amp; Forudsigelighed</p>
+    </header>
+
+    <main class="flex-1 flex flex-col md:flex-row w-full max-w-7xl mx-auto overflow-hidden">
+
+        <!-- Venstre panel: Indstillinger og Navne -->
+        <div id="controlPanel" class="w-full md:w-80 shrink-0 border-b md:border-b-0 md:border-r border-stone-200 bg-stone-50 flex flex-col h-full overflow-y-auto p-4 md:p-6 transition-all duration-300">
+
+            <div class="mb-4 flex-1 flex flex-col min-h-[150px]">
+                <label class="block text-sm font-semibold mb-2 text-slate-600 flex justify-between items-center">
+                    <span>Klasseliste (<span id="studentCount">0</span>)</span>
+                </label>
+                <textarea id="namesInput" class="w-full flex-1 bg-white border-2 border-stone-200 rounded-xl p-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 resize-none font-medium text-sm leading-relaxed shadow-sm transition-all" placeholder="Indsæt navne her... ét navn pr. linje."></textarea>
+            </div>
+
+            <!-- Størrelse / Antal -->
+            <div class="mb-4 shrink-0 bg-white p-4 rounded-xl border border-stone-200 shadow-sm">
+                <label class="block text-sm font-semibold mb-3 text-slate-600">Fordelingsmetode</label>
+
+                <div class="bg-stone-100 rounded-lg p-1 mb-4 flex border border-stone-200">
+                    <button id="modeGroupsBtn" onclick="setMode('groups')" class="flex-1 py-2 text-xs sm:text-sm rounded-md bg-teal-600 text-white font-bold shadow-sm transition-all">Antal Grupper</button>
+                    <button id="modeSizeBtn" onclick="setMode('size')" class="flex-1 py-2 text-xs sm:text-sm rounded-md text-slate-500 hover:bg-stone-200 transition-all font-medium">Elever pr. gr.</button>
+                </div>
+
+                <div class="flex items-center justify-between">
+                    <span id="numberLabel" class="text-sm font-medium text-slate-700">Antal Grupper</span>
+                    <div class="flex items-center gap-2">
+                        <button onclick="changeNumber(-1)" class="w-9 h-9 rounded-lg bg-stone-100 hover:bg-stone-200 border border-stone-200 text-slate-600 flex items-center justify-center font-bold transition-colors text-lg">-</button>
+                        <span id="numberDisplay" class="font-bold text-xl w-8 text-center text-teal-700">4</span>
+                        <button onclick="changeNumber(1)" class="w-9 h-9 rounded-lg bg-stone-100 hover:bg-stone-200 border border-stone-200 text-slate-600 flex items-center justify-center font-bold transition-colors text-lg">+</button>
+                    </div>
+                </div>
+                <!-- Live preview af faktisk fordeling -->
+                <p id="groupPreview" class="text-xs text-center text-teal-600 bg-teal-50 rounded-lg px-2 py-1.5 mt-3 font-medium min-h-[28px] transition-all"></p>
+            </div>
+
+            <!-- Tal eller Farver -->
+            <div class="mb-4 shrink-0 bg-white p-4 rounded-xl border border-stone-200 shadow-sm">
+                <label class="block text-sm font-semibold mb-3 text-slate-600">Gruppenavne</label>
+                <div class="bg-stone-100 rounded-lg p-1 flex border border-stone-200">
+                    <button id="nameNumBtn" onclick="setNamingStyle('number')" class="flex-1 py-2 text-xs sm:text-sm rounded-md bg-teal-600 text-white font-bold shadow-sm transition-all">Tal (1, 2, 3)</button>
+                    <button id="nameColBtn" onclick="setNamingStyle('color')" class="flex-1 py-2 text-xs sm:text-sm rounded-md text-slate-500 hover:bg-stone-200 transition-all font-medium">Farver</button>
+                </div>
+            </div>
+
+
+            <!-- Low Arousal Toggles -->
+            <div id="animationSettingsBlock" class="mb-4 bg-white p-4 rounded-xl border border-stone-200 shadow-sm shrink-0 flex flex-col gap-3 transition-opacity duration-300">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-semibold text-slate-700">Visuel Animation</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="toggleAnimation" class="sr-only peer" checked>
+                        <div class="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-500"></div>
+                    </label>
+                </div>
+                <!-- Animations-hastighed -->
+                <div class="border-t border-stone-100 pt-3">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-semibold text-slate-700">Hastighed</span>
+                        <span id="speedLabel" class="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full">Medium</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-slate-400 shrink-0">Langsom</span>
+                        <input type="range" id="speedSlider" min="1" max="5" value="3"
+                               oninput="setAnimationSpeed(this.value)"
+                               class="flex-1 accent-teal-600 cursor-pointer h-1.5">
+                        <span class="text-xs text-slate-400 shrink-0">Hurtig</span>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between border-t border-stone-100 pt-3">
+                    <span class="text-sm font-semibold text-slate-700">Lydeffekter</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="toggleSound" class="sr-only peer" checked>
+                        <div class="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-500"></div>
+                    </label>
+                </div>
+                <div class="flex items-center justify-between border-t border-stone-100 pt-3">
+                    <span class="text-sm font-semibold text-slate-700">Konfetti (Afslutning)</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="toggleConfetti" class="sr-only peer" checked>
+                        <div class="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-500"></div>
+                    </label>
+                </div>
+                <div class="flex items-center justify-between border-t border-stone-100 pt-3">
+                    <div class="flex flex-col">
+                        <span class="text-sm font-semibold text-slate-700">Hemmelig Lodtrækning</span>
+                        <span class="text-[10px] text-slate-400 leading-tight mt-0.5">Afslør navne til sidst</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input type="checkbox" id="toggleSecret" class="sr-only peer">
+                        <div class="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-500"></div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Lodtrækningsforløb -->
+            <div class="mb-5 bg-white p-4 rounded-xl border border-stone-200 shadow-sm shrink-0 flex flex-col gap-3">
+                <label class="block text-sm font-semibold text-slate-600 flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Lodtrækningsforløb
+                </label>
+
+                <div class="flex flex-col gap-2">
+                    <label class="flex items-start gap-3 p-3 rounded-lg border border-stone-200 cursor-pointer hover:bg-stone-50 transition-colors has-[:checked]:bg-teal-50 has-[:checked]:border-teal-300">
+                        <input type="radio" name="drawFlow" value="auto" class="mt-0.5 accent-teal-600" checked onchange="setDrawFlow(this.value)">
+                        <div class="min-w-0">
+                            <span class="text-sm font-bold text-slate-700 block">Automatisk</span>
+                            <span class="text-xs text-slate-500 leading-snug block mt-0.5">Maskinen trækker automatisk</span>
+                        </div>
+                    </label>
+
+                    <label class="flex items-start gap-3 p-3 rounded-lg border border-stone-200 cursor-pointer hover:bg-stone-50 transition-colors has-[:checked]:bg-teal-50 has-[:checked]:border-teal-300">
+                        <input type="radio" name="drawFlow" value="order" class="mt-0.5 accent-teal-600" onchange="setDrawFlow(this.value)">
+                        <div class="min-w-0">
+                            <span class="text-sm font-bold text-slate-700 block">Vis rækkefølge først</span>
+                            <span class="text-xs text-slate-500 leading-snug block mt-0.5">Klassen ser og godkender listen før trækning</span>
+                        </div>
+                    </label>
+
+                    <label class="flex items-start gap-3 p-3 rounded-lg border border-stone-200 cursor-pointer hover:bg-stone-50 transition-colors has-[:checked]:bg-teal-50 has-[:checked]:border-teal-300">
+                        <input type="radio" name="drawFlow" value="button" class="mt-0.5 accent-teal-600" onchange="setDrawFlow(this.value)">
+                        <div class="min-w-0">
+                            <span class="text-sm font-bold text-slate-700 block">Fælles TRÆK-knap</span>
+                            <span class="text-xs text-slate-500 leading-snug block mt-0.5">Navnene skifter, og en elev trykker på knappen</span>
+                        </div>
+                    </label>
+
+                    <label class="flex items-start gap-3 p-3 rounded-lg border border-stone-200 cursor-pointer hover:bg-stone-50 transition-colors has-[:checked]:bg-teal-50 has-[:checked]:border-teal-300">
+                        <input type="radio" name="drawFlow" value="draw" class="mt-0.5 accent-teal-600" onchange="setDrawFlow(this.value)">
+                        <div class="min-w-0">
+                            <span class="text-sm font-bold text-slate-700 block">Alle elever tegner</span>
+                            <span class="text-xs text-slate-500 leading-snug block mt-0.5">Hver elev tegner sit navn for at skabe tilfældighed</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <button id="generateBtn" onclick="startGeneration()" class="shrink-0 w-full py-3.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-lg shadow-sm transition-all focus:outline-none focus:ring-4 focus:ring-teal-500/30">
+                Start Lodtrækning
+            </button>
+        </div>
+
+        <!-- Højre panel: Resultater og Pulje -->
+        <div id="resultsArea" class="flex-1 flex flex-col relative hidden md:flex h-full bg-[#F9F9F8]">
+
+            <!-- Puljen (Hatten) -->
+            <div id="poolArea" class="bg-white p-4 border-b border-stone-200 flex-col hidden shrink-0 shadow-sm z-10">
+                <div class="flex justify-between items-center mb-3 max-w-4xl mx-auto w-full gap-3">
+                    <div id="poolTextContainer" class="min-w-0">
+                        <h2 class="text-lg font-bold text-slate-700 truncate" id="poolTitle">Puljen (Lodtrækning i gang)</h2>
+                        <p id="poolStatusText" class="text-sm text-slate-500 font-medium mt-1">Venter på at starte...</p>
+                    </div>
+
+                    <!-- TRÆK!-knap (vises i elevtræk-tilstand) -->
+                    <div id="stopBtnContainer" class="hidden shrink-0">
+                        <button onclick="requestStop()" id="stopBtn"
+                                class="px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 active:bg-indigo-700 text-white rounded-xl font-black text-xl shadow-lg transition-colors flex items-center gap-2 select-none animate-pulse">
+                            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3" stroke-width="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.5" fill="currentColor"/></svg>
+                            TRÆK!
+                        </button>
+                    </div>
+
+
+                    <div class="text-sm font-semibold text-teal-700 bg-teal-50 border border-teal-100 px-3 py-1.5 rounded-lg shrink-0">
+                        Mangler: <span id="poolCountDisplay">0</span>
+                    </div>
+                </div>
+                <div id="studentPool" class="flex flex-wrap gap-2 justify-center min-h-[40px] max-w-4xl mx-auto w-full transition-all"></div>
+            </div>
+
+            <!-- Gruppevisning Grid -->
+            <div id="groupGrid" class="flex-1 overflow-y-auto p-4 md:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 auto-rows-max content-start pb-24"></div>
+
+            <!-- Tom Tilstand -->
+            <div id="emptyState" class="absolute inset-0 flex items-center justify-center flex-col gap-4 text-slate-400">
+                <svg class="w-16 h-16 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                <p class="font-medium text-center px-6">Klar til fordeling.<br>Vælg indstillinger og tryk "Start Lodtrækning"</p>
+            </div>
+
+            <!-- Handlinger efter generering -->
+            <div id="resultActions" class="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex gap-3 hidden z-20 flex-wrap justify-center">
+                <button onclick="copyResults()" class="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold transition-colors shadow-sm flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                    Kopiér
+                </button>
+                <button onclick="window.print()" class="px-5 py-2.5 rounded-xl bg-white border-2 border-stone-200 hover:bg-stone-50 font-semibold text-slate-600 transition-colors shadow-sm flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    Print
+                </button>
+                <button onclick="resetApp()" class="px-5 py-2.5 rounded-xl bg-white border-2 border-stone-200 hover:bg-stone-50 font-semibold text-slate-600 transition-colors shadow-sm">
+                    Ret liste / Start forfra
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Scripts indlæses i korrekt rækkefølge -->
+    <script src="js/app.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/confetti.js"></script>
+    <script src="js/draw.js"></script>
+</body>
+</html>
